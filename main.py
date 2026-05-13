@@ -11,7 +11,7 @@ CHECK_INTERVAL = int(os.environ.get("CHECK_INTERVAL", "60"))
 
 def get_page_hash():
     try:
-        r = requests.get(URL, timeout=15)
+        r = requests.get(URL, timeout=15, verify=False)
         soup = BeautifulSoup(r.text, "html.parser")
         table = soup.find("table")
         content = table.get_text() if table else r.text
