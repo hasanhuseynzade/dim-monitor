@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 CHAT_ID = os.environ["CHAT_ID"]
+CHAT_ID_2 = os.environ.get("CHAT_ID_2", "")
 URL = "https://exidmet.dim.gov.az/dqq/ImtQeyd"
 CHECK_INTERVAL = int(os.environ.get("CHECK_INTERVAL", "60"))
 
@@ -32,14 +33,14 @@ def get_table_data():
 
         rows = table.find_all("tr")
         data = []
-        for row in rows[1:]:  # başlığı keç
+        for row in rows[1:]:
             cols = [c.get_text(strip=True) for c in row.find_all(["td", "th"])]
             if len(cols) >= 9:
                 data.append({
-                    "bos_yer": cols[6],       # Boş yerlərin sayı
-                    "unvan": cols[7],          # Ünvan
-                    "vezife_grupu": cols[8],   # Vəzifə qrupları
-                    "tarix": cols[1],          # İmtahan tarixi
+                    "bos_yer": cols[6],
+                    "unvan": cols[7],
+                    "vezife_grupu": cols[8],
+                    "tarix": cols[1],
                 })
 
         content = table.get_text()
@@ -59,14 +60,21 @@ def format_rows(data):
     return "\n\n".join(lines)
 
 def send_telegram(msg):
-    requests.post(
-        f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-        json={"chat_id": CHAT_ID, "text": msg, "parse_mode": "HTML"}
-    )
+    for chat in [CHAT_ID, CHAT_ID_2]:
+        if chat:
+            requests.post(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                json={"chat_id": chat, "text": msg, "parse_mode": "HTML"}
+            )
 
 def main():
-    send_telegram("✅ DIM Monitor işə düşdü. Səhifə izlənilir...")
+    send_telegram(
+        f"✅ DIM Monitor işə düşdü. Səhifə izlənilir...\n"
+        f"🕐 Başlama vaxtı: {time.strftime('%d.%m.%Y %H:%M:%S')}"
+    )
     last_hash = None
+    check_count = 0
+    daily_checks = 86400 // CHECK_INTERVAL
 
     while True:
         current_hash, data, error = get_table_data()
@@ -89,6 +97,14 @@ def main():
             )
             send_telegram(msg)
             last_hash = current_hash
+
+        check_count += 1
+        if check_count % daily_checks == 0:
+            send_telegram(
+                f"🟢 DIM Monitor aktiv işləyir.\n"
+                f"🕐 {time.strftime('%d.%m.%Y %H:%M:%S')}\n"
+                f"📋 Cədvəldə hal-hazırda <b>{len(data) if data else '?'} sətir</b> var."
+            )
 
         time.sleep(CHECK_INTERVAL)
 
