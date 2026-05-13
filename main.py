@@ -1,6 +1,8 @@
 import os
 import time
 import hashlib
+import ssl
+import urllib.request
 import requests
 from bs4 import BeautifulSoup
 
@@ -11,10 +13,20 @@ CHECK_INTERVAL = int(os.environ.get("CHECK_INTERVAL", "60"))
 
 def get_page_hash():
     try:
-        r = requests.get(URL, timeout=15, verify=False)
-        soup = BeautifulSoup(r.text, "html.parser")
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
+            "Accept-Language": "az,en;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        }
+        req = urllib.request.Request(URL, headers=headers)
+        with urllib.request.urlopen(req, context=ctx, timeout=20) as resp:
+            html = resp.read().decode("utf-8", errors="ignore")
+        soup = BeautifulSoup(html, "html.parser")
         table = soup.find("table")
-        content = table.get_text() if table else r.text
+        content = table.get_text() if table else html
         return hashlib.md5(content.encode()).hexdigest(), content
     except Exception as e:
         return None, str(e)
@@ -34,6 +46,7 @@ def main():
             send_telegram(f"⚠️ Səhifəyə qoşulmaq mümkün olmadı:\n{content}")
         elif last_hash is None:
             last_hash = current_hash
+            send_telegram("✅ Səhifə uğurla oxundu. İzləmə başladı.")
         elif current_hash != last_hash:
             send_telegram(
                 f"🔔 <b>DIM səhifəsində dəyişiklik aşkarlandı!</b>\n"
