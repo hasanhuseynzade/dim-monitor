@@ -4,6 +4,7 @@ import hashlib
 import ssl
 import urllib.request
 import requests
+from datetime import datetime, timezone, timedelta
 from bs4 import BeautifulSoup
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
@@ -11,6 +12,11 @@ CHAT_ID = os.environ["CHAT_ID"]
 CHAT_ID_2 = os.environ.get("CHAT_ID_2", "")
 URL = "https://exidmet.dim.gov.az/dqq/ImtQeyd"
 CHECK_INTERVAL = int(os.environ.get("CHECK_INTERVAL", "60"))
+
+BAKU_TZ = timezone(timedelta(hours=4))
+
+def baku_time():
+    return datetime.now(BAKU_TZ).strftime("%d.%m.%Y %H:%M:%S")
 
 def get_table_data():
     try:
@@ -70,7 +76,7 @@ def send_telegram(msg):
 def main():
     send_telegram(
         f"✅ DIM Monitor işə düşdü. Səhifə izlənilir...\n"
-        f"🕐 Başlama vaxtı: {time.strftime('%d.%m.%Y %H:%M:%S')}"
+        f"🕐 Başlama vaxtı: {baku_time()}"
     )
     last_hash = None
     check_count = 0
@@ -86,6 +92,7 @@ def main():
             msg = (
                 f"✅ İzləmə başladı. Cədvəldə <b>{len(data)} sətir</b> var.\n\n"
                 + format_rows(data)
+                + f"\n\n🔗 {URL}"
             )
             send_telegram(msg)
         elif current_hash != last_hash:
@@ -102,7 +109,7 @@ def main():
         if check_count % daily_checks == 0:
             send_telegram(
                 f"🟢 DIM Monitor aktiv işləyir.\n"
-                f"🕐 {time.strftime('%d.%m.%Y %H:%M:%S')}\n"
+                f"🕐 {baku_time()}\n"
                 f"📋 Cədvəldə hal-hazırda <b>{len(data) if data else '?'} sətir</b> var."
             )
 
