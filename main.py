@@ -11,7 +11,7 @@ CHAT_ID = os.environ["CHAT_ID"]
 URL = "https://exidmet.dim.gov.az/dqq/ImtQeyd"
 CHECK_INTERVAL = int(os.environ.get("CHECK_INTERVAL", "60"))
 
-def get_page_data():
+def get_table_data():
     try:
         ctx = ssl.create_default_context()
         ctx.check_hostname = False
@@ -24,19 +24,39 @@ def get_page_data():
         req = urllib.request.Request(URL, headers=headers)
         with urllib.request.urlopen(req, context=ctx, timeout=20) as resp:
             html = resp.read().decode("utf-8", errors="ignore")
+
         soup = BeautifulSoup(html, "html.parser")
         table = soup.find("table")
-        if table:
-            rows = table.find_all("tr")
-            row_count = len(rows) - 1  # başlıq sətri çıxılır
-            content = table.get_text()
-        else:
-            row_count = 0
-            content = html
+        if not table:
+            return None, None, "Cədvəl tapılmadı"
+
+        rows = table.find_all("tr")
+        data = []
+        for row in rows[1:]:  # başlığı keç
+            cols = [c.get_text(strip=True) for c in row.find_all(["td", "th"])]
+            if len(cols) >= 9:
+                data.append({
+                    "bos_yer": cols[6],       # Boş yerlərin sayı
+                    "unvan": cols[7],          # Ünvan
+                    "vezife_grupu": cols[8],   # Vəzifə qrupları
+                    "tarix": cols[1],          # İmtahan tarixi
+                })
+
+        content = table.get_text()
         page_hash = hashlib.md5(content.encode()).hexdigest()
-        return page_hash, row_count
+        return page_hash, data, None
+
     except Exception as e:
-        return None, str(e)
+        return None, None, str(e)
+
+def format_rows(data):
+    lines = []
+    for i, row in enumerate(data, 1):
+        lines.append(
+            f"<b>{i}.</b> 📍 {row['unvan'][:60]}\n"
+            f"   👔 Vəzifə: <b>{row['vezife_grupu']}</b> | 🪑 Boş yer: <b>{row['bos_yer']}</b> | 📅 {row['tarix']}"
+        )
+    return "\n\n".join(lines)
 
 def send_telegram(msg):
     requests.post(
@@ -47,32 +67,28 @@ def send_telegram(msg):
 def main():
     send_telegram("✅ DIM Monitor işə düşdü. Səhifə izlənilir...")
     last_hash = None
-    last_row_count = None
 
     while True:
-        current_hash, row_count = get_page_data()
+        current_hash, data, error = get_table_data()
 
         if current_hash is None:
-            send_telegram(f"⚠️ Səhifəyə qoşulmaq mümkün olmadı:\n{row_count}")
+            send_telegram(f"⚠️ Səhifəyə qoşulmaq mümkün olmadı:\n{error}")
         elif last_hash is None:
             last_hash = current_hash
-            last_row_count = row_count
-            send_telegram(f"✅ Səhifə uğurla oxundu. İzləmə başladı.\n📋 Cədvəldə hal-hazırda <b>{row_count} sətir</b> var.")
-        elif current_hash != last_hash:
-            if row_count != last_row_count:
-                diff = row_count - last_row_count
-                arrow = "🟢 +" if diff > 0 else "🔴"
-                change_info = f"{arrow}{diff} sətir ({last_row_count} → {row_count})"
-            else:
-                change_info = "Sətir sayı eynidir, amma məlumat dəyişib"
-
-            send_telegram(
-                f"🔔 <b>DIM səhifəsində dəyişiklik aşkarlandı!</b>\n"
-                f"📋 {change_info}\n"
-                f"🔗 {URL}"
+            msg = (
+                f"✅ İzləmə başladı. Cədvəldə <b>{len(data)} sətir</b> var.\n\n"
+                + format_rows(data)
             )
+            send_telegram(msg)
+        elif current_hash != last_hash:
+            msg = (
+                f"🔔 <b>DIM səhifəsində dəyişiklik aşkarlandı!</b>\n"
+                f"📋 Cədvəldə indi <b>{len(data)} sətir</b> var.\n\n"
+                + format_rows(data)
+                + f"\n\n🔗 {URL}"
+            )
+            send_telegram(msg)
             last_hash = current_hash
-            last_row_count = row_count
 
         time.sleep(CHECK_INTERVAL)
 
