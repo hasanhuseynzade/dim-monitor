@@ -49,18 +49,22 @@ def get_table_data():
 
         rows = table.find_all("tr")
         data = []
+        filtered_content = ""
         for row in rows[1:]:
             cols = [c.get_text(strip=True) for c in row.find_all(["td", "th"])]
             if len(cols) >= 9:
+                # Naxçıvan olan sətirləri tamamilə keç
+                if "Naxçıvan" in cols[7]:
+                    continue
                 data.append({
                     "bos_yer": cols[6],
                     "unvan": cols[7],
                     "vezife_grupu": cols[8],
                     "tarix": cols[1],
                 })
+                filtered_content += "".join(cols)
 
-        content = table.get_text()
-        page_hash = hashlib.md5(content.encode()).hexdigest()
+        page_hash = hashlib.md5(filtered_content.encode()).hexdigest()
         return page_hash, data, None
 
     except Exception as e:
@@ -71,8 +75,9 @@ def format_rows(data):
         return "Məlumat yoxdur."
     lines = []
     for i, row in enumerate(data, 1):
+        unvan = row['unvan'].replace("İmtahan", "").strip()
         lines.append(
-            f"<b>{i}.</b> 📍 {row['unvan'][:60]}\n"
+            f"<b>{i}.</b> 📍 {unvan[:60]}\n"
             f"   👔 Vəzifə: <b>{row['vezife_grupu']}</b> | 🪑 Boş yer: <b>{row['bos_yer']}</b> | 📅 {row['tarix']}"
         )
     return "\n\n".join(lines)
@@ -85,8 +90,6 @@ def send_telegram(msg, chat_id=None):
                 f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
                 json={"chat_id": chat, "text": msg, "parse_mode": "HTML"}
             )
-
-# ── Komanda handler-ları ──────────────────────────────────────
 
 def handle_start(chat_id):
     uptime = ""
@@ -153,8 +156,6 @@ def handle_last(chat_id):
         chat_id=chat_id
     )
 
-# ── Telegram polling (komandaları dinləyir) ───────────────────
-
 def poll_commands():
     offset = None
     while True:
@@ -183,8 +184,6 @@ def poll_commands():
                     handle_last(chat_id)
         except Exception:
             time.sleep(5)
-
-# ── Monitor loop ──────────────────────────────────────────────
 
 def monitor_loop():
     last_hash = None
@@ -230,8 +229,6 @@ def monitor_loop():
             )
 
         time.sleep(CHECK_INTERVAL)
-
-# ── Main ──────────────────────────────────────────────────────
 
 def main():
     state["started_at"] = datetime.now(BAKU_TZ)
