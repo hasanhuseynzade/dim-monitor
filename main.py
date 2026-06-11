@@ -53,7 +53,7 @@ def get_table_data():
         for row in rows[1:]:
             cols = [c.get_text(strip=True) for c in row.find_all(["td", "th"])]
             if len(cols) >= 9:
-                if "Naxçıvan" in cols[7]:
+                if "Naxçıvan" in cols[7] or "Gəncə" in cols[7]:
                     continue
                 data.append({
                     "bos_yer": cols[6],
