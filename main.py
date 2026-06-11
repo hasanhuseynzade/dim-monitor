@@ -53,7 +53,6 @@ def get_table_data():
         for row in rows[1:]:
             cols = [c.get_text(strip=True) for c in row.find_all(["td", "th"])]
             if len(cols) >= 9:
-                # Naxçıvan olan sətirləri tamamilə keç
                 if "Naxçıvan" in cols[7]:
                     continue
                 data.append({
@@ -61,6 +60,7 @@ def get_table_data():
                     "unvan": cols[7],
                     "vezife_grupu": cols[8],
                     "tarix": cols[1],
+                    "qeydiyyat": cols[9] if len(cols) > 9 else "",
                 })
                 filtered_content += "".join(cols)
 
@@ -76,9 +76,11 @@ def format_rows(data):
     lines = []
     for i, row in enumerate(data, 1):
         unvan = row['unvan'].replace("İmtahan", "").strip()
+        qeydiyyat = row.get('qeydiyyat', '')
         lines.append(
             f"<b>{i}.</b> 📍 {unvan[:60]}\n"
-            f"   👔 Vəzifə: <b>{row['vezife_grupu']}</b> | 🪑 Boş yer: <b>{row['bos_yer']}</b> | 📅 {row['tarix']}"
+            f"   👔 Vəzifə: <b>{row['vezife_grupu']}</b> | 🪑 Boş yer: <b>{row['bos_yer']}</b> | 📅 {row['tarix']}\n"
+            f"   📝 Qeydiyyat: <b>{qeydiyyat}</b>"
         )
     return "\n\n".join(lines)
 
